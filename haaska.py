@@ -37,8 +37,7 @@ class HomeAssistant(object):
         agent_fmt = agent_str % (os.environ['AWS_DEFAULT_REGION'],
                                  requests.utils.default_user_agent())
         self.session = requests.Session()
-        self.session.headers = {'x-ha-access': config.password,
-                                'content-type': 'application/json',
+        self.session.headers = {'content-type': 'application/json',
                                 'User-Agent': agent_fmt}
         self.session.verify = config.ssl_verify
         self.session.cert = config.ssl_client
@@ -51,19 +50,18 @@ class HomeAssistant(object):
         r.raise_for_status()
         return r.json()
 
-    def post(self, relurl, d, wait=False):
+    def post(self, d, wait=False):
         read_timeout = None if wait else 0.01
         r = None
         try:
-            logger.debug('calling %s with %s', relurl, str(d))
-            r = self.session.post(self.build_url(relurl),
+            logger.debug('calling POST with %s', str(d))
+            r = self.session.post(self.config.url,
                                   data=json.dumps(d),
                                   timeout=(None, read_timeout))
             r.raise_for_status()
         except requests.exceptions.ReadTimeout:
             # Allow response timeouts after request was sent
-            logger.debug('request for %s sent without waiting for response',
-                         relurl)
+            logger.debug('request for POST sent without waiting for response')
         return r
 
 
@@ -81,7 +79,6 @@ class Configuration(object):
         opts['url'] = self.get(['url', 'ha_url'],
                                default='http://localhost:8123/api')
         opts['ssl_verify'] = self.get(['ssl_verify', 'ha_cert'], default=True)
-        opts['password'] = self.get(['password', 'ha_passwd'], default='')
         opts['ssl_client'] = self.get(['ssl_client'], default='')
         opts['debug'] = self.get(['debug'], default=False)
         self.opts = opts
@@ -105,4 +102,4 @@ def event_handler(event, context):
         logger.setLevel(logging.DEBUG)
     ha = HomeAssistant(config)
 
-    return ha.post('alexa/smart_home', event, wait=True).json()
+    return ha.post(event, wait=True).json()
